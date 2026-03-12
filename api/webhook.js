@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   try {
-    const event = req.body.events?.[0];
+    const event = req.body?.events?.[0];
 
     if (!event) {
       return res.status(200).send("ok");
@@ -12,34 +12,38 @@ export default async function handler(req, res) {
 
     const userMessage = event.message.text;
 
-    const difyResponse = await fetch("https://api.dify.ai/v1/chat-messages", {
+    const DIFY_API_URL = "https://api.dify.ai/v1/chat-messages";
+    const DIFY_API_KEY = "app-EpeyU2WqcswLSmvMhcjOHkob";
+    const LINE_ACCESS_TOKEN = "29nsKzi0L/JftcJqsCrylW1xbVGW1g9+Vpyk4xTBesEYoGo4PozMIcyWtMI3icTLvM/rsFDEb5XFgsysuL3QTg2L+7eshNJenAw4w4fUNvTSrcH90QjZ8oLP6qTExfw/PkOJE0WxkZIyHX5v8X9qlAdB04t89/1O/w1cDnyilFU=";
+
+    const difyResponse = await fetch(DIFY_API_URL, {
       method: "POST",
       headers: {
-        "Authorization": "Bearer https://api.dify.ai/v1",
+        "Authorization": `Bearer ${DIFY_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
         inputs: {},
         query: userMessage,
-        user: "line-user",
+        user: `line-${event.source?.userId || "anonymous"}`,
         response_mode: "blocking"
       })
     });
 
-    const data = await difyResponse.json();
-    console.log("Dify response:", JSON.stringify(data));
+    const difyData = await difyResponse.json();
+    console.log("Dify response:", JSON.stringify(difyData));
 
     const aiMessage =
-      data.answer ||
-      data.message ||
-      data.error ||
-      `Difyエラー: ${JSON.stringify(data)}`;
+      difyData.answer ||
+      difyData.message ||
+      difyData.error ||
+      "Dify側でエラーが発生しました";
 
-    await fetch("https://api.line.me/v2/bot/message/reply", {
+    const lineResponse = await fetch("https://api.line.me/v2/bot/message/reply", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer NrxpXwM0YY8v78ZuAC4gZBI8AUqdEhuNeNa/n4zNsjBl7xJMFkkk7FoSVHMqtJtmvM/rsFDEb5XFgsysuL3QTg2L+7eshNJenAw4w4fUNvQqj8YVrKBylzCLnehsgQWlgM3KTufCbn6GZKdHgceqHQdB04t89/1O/w1cDnyilFU="
+        "Authorization": `Bearer ${LINE_ACCESS_TOKEN}`
       },
       body: JSON.stringify({
         replyToken: event.replyToken,
@@ -52,10 +56,12 @@ export default async function handler(req, res) {
       })
     });
 
+    const lineResultText = await lineResponse.text();
+    console.log("LINE response:", lineResultText);
+
     return res.status(200).send("ok");
   } catch (error) {
     console.error("Webhook error:", error);
-
     return res.status(200).send("ok");
   }
 }
